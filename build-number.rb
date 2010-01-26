@@ -95,7 +95,7 @@ class ProgramVersion
     def parse_version(version_string)
       version = ProgramVersion.new
 
-      match = version_string.chomp.strip.match(VERSION_RE)
+      match = VERSION_RE.match(version_string.chomp.strip)
       raise "Invalid version string format" unless match
 
       int = lambda { |x| x ? x.to_i : x }
@@ -280,27 +280,28 @@ end
 
 products_path   = ENV['BUILT_PRODUCTS_DIR']
 infoplist_path  = ENV['INFOPLIST_PATH']
-path            = options[:path]
 
 if :xcode == options[:path]
-  raise "Not running under Xcode" if products_path.nil? or info_plist_path.nil?
+  raise "Not running under Xcode" if products_path.nil? or infoplist_path.nil?
   options[:path] = File.join(products_path, infoplist_path)
 end
+
 
 unless File.exist?(options[:path])
   raise "Cannot find Info.plist in #{options[:path]}."
 end
 
+path = options[:path]
 # Load the plist
 info_plist = OSX::NSDictionary.dictionaryWithContentsOfFile(path).mutableCopy
 # Get the current HEAD
 current_head = %x(git describe --always).chomp
 # Get the list of build tags and turn them into version numbers.
 build_tags = `git tag -l build-\\* --contains #{current_head}`.chomp.split($/)
-build_tags.map! { |tag| ProgramVersion.new(tag.sub(/^build-/, '')) }
+build_tags.map! { |tag| ProgramVersion.parse_version(tag.sub(/^build-/, '')) }
 
 # Get the CFBundleVersion from the plist.
-old_version = ProgramVersion.new(info_plist['CFBundleVersion'])
+old_version = ProgramVersion.parse_version(info_plist['CFBundleVersion'])
 # Add the old version to the list of build tags.
 build_tags << old_version.dup
 # Get the largest version we know about for this head.
